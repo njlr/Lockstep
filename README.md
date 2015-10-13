@@ -27,7 +27,8 @@ The programmer must ensure:
 
 ## Get Started
 
-Take a look at `io.njlr.lockstep.sample.tests.SyncTests` for an example of two peers running a simulation. 
+ * See `io.njlr.lockstep.sample.Main` for an example of how it fits together. 
+ * Take a look at `io.njlr.lockstep.sample.tests.SyncTests` for an example of two peers running a simulation. 
 
 ## Future Work
 
