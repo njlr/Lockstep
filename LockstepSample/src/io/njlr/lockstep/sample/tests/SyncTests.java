@@ -8,8 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.junit.Test;
-
 import com.google.common.collect.ImmutableSet;
 
 import io.njlr.lockstep.network.NetworkAddress;
@@ -32,7 +30,6 @@ public final class SyncTests {
 		new SyncTests().testSynchronization();
 	}
 
-	@Test
 	public void testSynchronization() throws UnknownHostException {
 		
 		final int portA = 1234;
