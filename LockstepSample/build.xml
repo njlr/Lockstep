@@ -5,26 +5,25 @@
               directory with the processing instruction <?eclipse.ant.import?>
               as the first entry and export the buildfile again. --><project basedir="." default="build" name="LockstepSample">
     <property environment="env"/>
+    <property name="junit.output.dir" value="junit"/>
     <property name="Lockstep.location" value="../Lockstep"/>
     <property name="debuglevel" value="source,lines,vars"/>
     <property name="target" value="1.8"/>
     <property name="source" value="1.8"/>
-    <path id="JUnit 4.libraryclasspath">
-        <pathelement location="C:/Program Files/Eclipse/eclipse-java-mars-R-win32-x86_64/eclipse/plugins/org.junit_4.12.0.v201504281640/junit.jar"/>
-        <pathelement location="C:/Program Files/Eclipse/eclipse-java-mars-R-win32-x86_64/eclipse/plugins/org.hamcrest.core_1.3.0.v201303031735.jar"/>
-    </path>
     <path id="Lockstep.classpath">
         <pathelement location="${Lockstep.location}/bin"/>
         <pathelement location="${Lockstep.location}/lib/guava-18.0.jar"/>
         <pathelement location="${Lockstep.location}/lib/bytes-1.0.jar"/>
-        <path refid="JUnit 4.libraryclasspath"/>
+        <pathelement location="${Lockstep.location}/lib/junit.jar"/>
+        <pathelement location="${Lockstep.location}/lib/hamcrest-core-1.3.jar"/>
     </path>
     <path id="LockstepSample.classpath">
         <pathelement location="bin"/>
         <path refid="Lockstep.classpath"/>
         <pathelement location="lib/guava-18.0.jar"/>
         <pathelement location="lib/bytes-1.0.jar"/>
-        <path refid="JUnit 4.libraryclasspath"/>
+        <pathelement location="lib/hamcrest-core-1.3.jar"/>
+        <pathelement location="lib/junit.jar"/>
     </path>
     <target name="init">
         <mkdir dir="bin"/>
@@ -73,5 +72,21 @@
         <java classname="io.njlr.lockstep.sample.tests.SyncTests" failonerror="true" fork="yes">
             <classpath refid="LockstepSample.classpath"/>
         </java>
+    </target>
+    <target name="EncodeDecodeTests">
+        <mkdir dir="${junit.output.dir}"/>
+        <junit fork="yes" printsummary="withOutAndErr">
+            <formatter type="xml"/>
+            <test name="io.njlr.lockstep.sample.tests.EncodeDecodeTests" todir="${junit.output.dir}"/>
+            <classpath refid="LockstepSample.classpath"/>
+        </junit>
+    </target>
+    <target name="junitreport">
+        <junitreport todir="${junit.output.dir}">
+            <fileset dir="${junit.output.dir}">
+                <include name="TEST-*.xml"/>
+            </fileset>
+            <report format="frames" todir="${junit.output.dir}"/>
+        </junitreport>
     </target>
 </project>
