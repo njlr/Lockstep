@@ -3,7 +3,12 @@ A Java framework for running interactive simulations across a network.
 
 ## About
 
-There are two approaches for running large simulations across a network: 
+The problem: 
+ * We have a large simulation that we want to run on several machines on a network
+ * Commands may be sent to the simulation at any time, by any machine
+ * Each machine must see the exact same simulation
+
+There are two approaches: 
 
  1. Client-server: One participant runs the whole simulation and sends periodic state-updates to all clients. The server is the single-source-of-truth. 
  2. Peer-to-peer: Every participant runs the simulation deterministicly. Interactive commands must be coordinated to ensure everyone is in-sync. 
@@ -27,6 +32,8 @@ The programmer must ensure:
 
 ## Get Started
 
+ * `Lockstep/` contains the framework; `LockstepSample/` contains an example application. 
+ * Each has an Ant build file, or they can be imported into Eclipse. 
  * See `io.njlr.lockstep.sample.Main` for an example of how it fits together. 
  * Take a look at `io.njlr.lockstep.sample.tests.SyncTests` for an example of two peers running a simulation. 
 
