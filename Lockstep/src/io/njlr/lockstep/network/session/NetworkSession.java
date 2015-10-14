@@ -86,7 +86,13 @@ public final class NetworkSession extends AbstractExecutionThreadService {
 		}
 	}
 	
-	public NetworkSession(final int port) {
+	/**
+	 * Creates a new <code>NetworkSession</code> instance. 
+	 * 
+	 * @param port The port to bind to
+	 * @param executorService The <code>ExecutorService</code> used for callbacks etc. This is automatically shutdown with the service. 
+	 */
+	public NetworkSession(final int port, final ExecutorService executorService) {
 		
 		super();
 		
@@ -94,9 +100,14 @@ public final class NetworkSession extends AbstractExecutionThreadService {
 		Preconditions.checkArgument(port <= 65535);
 		
 		this.port = port;
+		this.executorService = executorService;
 		
 		bindings = new HashMap<>();
-		executorService = Executors.newCachedThreadPool(); // TODO: Param?
+	}
+	
+	public NetworkSession(final int port) {
+		
+		this(port, Executors.newCachedThreadPool());
 	}
 	
 	@Override
@@ -220,8 +231,11 @@ public final class NetworkSession extends AbstractExecutionThreadService {
 					logger.warning("No binding found for " + packet);
 				} else {
 					
+					final Channel c = channel;
 					// Strip off the "split" byte; downstream handlers should be unaware of it
-					channel.handle(Bytes.of(packet.getData()).sub(1));
+					final Bytes d = Bytes.of(packet.getData()).sub(1); 
+					
+					executorService.submit(() -> { c.handle(d); });
 				}
 			}
 		}

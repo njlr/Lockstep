@@ -94,27 +94,29 @@ public final class SimulationManager<T extends Simulation> extends AbstractExecu
 	 */
 	public void submitAction(final SimulationAction<T> action) {
 		
-		synchronized (lock) {
+		if (!keepRunning) {
 			
-			// Which sequence number should this action be executed on? 
-			final int actionSequenceNumber = actionSequenceNumber();
+			return;
+		}
+		
+		// Which sequence number should this action be executed on? 
+		final int actionSequenceNumber = actionSequenceNumber();
+		
+		logger.fine("@" + sequenceNumber + ": Submitting " + new SequencedAction<>(actionSequenceNumber, action));
+		
+		// Queue the action for local execution
+		queue(new SequencedAction<>(actionSequenceNumber, action));
+		
+		// Notify all peers... 
+		final Bytes message = new BytesBuilder()
+				.append(sequencedActionMessageLeadingByte)
+				.appendInt(actionSequenceNumber)
+				.append(action.encode())
+				.toBytes();
+		
+		for (final NetworkAddress peer : settings.peers()) {
 			
-			logger.fine("@" + sequenceNumber + ": Submitting " + new SequencedAction<>(actionSequenceNumber, action));
-			
-			// Queue the action for local execution
-			queue(new SequencedAction<>(actionSequenceNumber, action));
-			
-			// Notify all peers... 
-			final Bytes message = new BytesBuilder()
-					.append(sequencedActionMessageLeadingByte)
-					.appendInt(actionSequenceNumber)
-					.append(action.encode())
-					.toBytes();
-			
-			for (final NetworkAddress peer : settings.peers()) {
-				
-				session.send(peerBindings.get(peer), message);
-			}
+			session.send(peerBindings.get(peer), message);
 		}
 	}
 	
@@ -149,9 +151,9 @@ public final class SimulationManager<T extends Simulation> extends AbstractExecu
 		
 		while (keepRunning) {
 			
-			synchronized (lock) {
+			while (Sequence32.isMoreRecent(targetSequenceNumber(), sequenceNumber) && keepRunning) {
 				
-				while (Sequence32.isMoreRecent(targetSequenceNumber(), sequenceNumber) && keepRunning) {
+				synchronized (lock) {
 					
 					final List<SimulationAction<T>> tickActions = new ArrayList<>();
 					
@@ -172,6 +174,7 @@ public final class SimulationManager<T extends Simulation> extends AbstractExecu
 						}
 					}
 					
+					
 					// Sort by hashCode so that they are in uniform order between peers
 					tickActions.sort((x, y) -> { return x.hashCode() - y.hashCode(); });
 					
@@ -182,29 +185,35 @@ public final class SimulationManager<T extends Simulation> extends AbstractExecu
 						
 						action.execute(simulation);
 					}
-					
-					// Tick the simulation
-					simulation.tick();
+				}
+				
+				// Tick the simulation
+				simulation.tick();
+				
+				synchronized (lock) {
 					
 					// Update our sequence number
 					sequenceNumber = Sequence32.next(sequenceNumber);
 					
 					logger.finer("@" + sequenceNumber + ": Updated sequence number");
-					
-					// Notify all peers of our progress
-					final Bytes message = new BytesBuilder(5)
-							.append(sequenceNumberUpdateMessageLeadingByte)
-							.appendInt(sequenceNumber)
-							.toBytes();
-					
-					for (final NetworkAddress peer : settings.peers()) {
-					
-						session.send(peerBindings.get(peer), message);
-					}
 				}
 				
-				if (keepRunning) {
+				// Notify all peers of our progress
+				final Bytes message = new BytesBuilder(5)
+						.append(sequenceNumberUpdateMessageLeadingByte)
+						.appendInt(sequenceNumber)
+						.toBytes();
 				
+				for (final NetworkAddress peer : settings.peers()) {
+				
+					session.send(peerBindings.get(peer), message);
+				}
+			}
+			
+			if (keepRunning) {
+			
+				synchronized (lock) {
+					
 					lock.wait();
 				}
 			}
@@ -239,46 +248,43 @@ public final class SimulationManager<T extends Simulation> extends AbstractExecu
 	
 	private void onMessageReceived(final ChannelBinding binding, final Bytes content) {
 		
-		synchronized (lock) {
+		if (!keepRunning) {
 			
-			if (!keepRunning) {
+			return;
+		}
+		
+		final BytesReader reader = content.read();
+		
+		final byte leadingByte = reader.readByte();
+		
+		if (leadingByte == sequenceNumberUpdateMessageLeadingByte) {
+			
+			reportPeerProgress(binding.remoteAddress(), reader.readInt());
+		} else if (leadingByte == sequencedActionMessageLeadingByte) {
+			
+			final int actionSequenceNumber = reader.readInt();
+			
+			if (!Sequence32.isMoreRecent(actionSequenceNumber, sequenceNumber)) {
 				
-				return;
+				logger.warning("@" + sequenceNumber + ": Received an action for " + actionSequenceNumber);
 			}
 			
-			final BytesReader reader = content.read();
+			final Bytes actionData = reader.readRemaining();
 			
-			final byte leadingByte = reader.readByte();
+			final Optional<SimulationAction<T>> action = decoder.tryDecode(actionData);
 			
-			if (leadingByte == sequenceNumberUpdateMessageLeadingByte) {
+			if (action.isPresent()) {
 				
-				reportPeerProgress(binding.remoteAddress(), reader.readInt());
-			} else if (leadingByte == sequencedActionMessageLeadingByte) {
+				logger.finer("@" + sequenceNumber + ": Received " + new SequencedAction<>(actionSequenceNumber, action.get()));
 				
-				final int actionSequenceNumber = reader.readInt();
-				
-				if (!Sequence32.isMoreRecent(actionSequenceNumber, sequenceNumber)) {
-					
-					logger.warning("@" + sequenceNumber + ": Received an action for " + actionSequenceNumber);
-				}
-				
-				final Bytes actionData = reader.readRemaining();
-				
-				final Optional<SimulationAction<T>> action = decoder.tryDecode(actionData);
-				
-				if (action.isPresent()) {
-					
-					logger.finer("@" + sequenceNumber + ": Received " + new SequencedAction<>(actionSequenceNumber, action.get()));
-					
-					queue(new SequencedAction<>(actionSequenceNumber, action.get()));
-				} else {
-					
-					logger.warning("@" + sequenceNumber + ": Could not decode action. ");
-				}
+				queue(new SequencedAction<>(actionSequenceNumber, action.get()));
 			} else {
 				
-				logger.warning("@" + sequenceNumber + ": Could not parse data. ");
+				logger.warning("@" + sequenceNumber + ": Could not decode action. ");
 			}
+		} else {
+			
+			logger.warning("@" + sequenceNumber + ": Could not parse data. ");
 		}
 	}
 	
