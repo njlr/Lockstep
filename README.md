@@ -25,6 +25,10 @@ The programmer must ensure:
  * The simulation is deterministic
  * Actions can be encoded and decoded properly
 
+## Get Started
+
+ * See `io.njlr.lockstep.sample.Main` for an example of how it fits together. 
+ * Take a look at `io.njlr.lockstep.sample.tests.SyncTests` for an example of two peers running a simulation. 
 
 ## Future Work
 
